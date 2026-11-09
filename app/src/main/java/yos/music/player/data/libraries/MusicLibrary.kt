@@ -169,12 +169,10 @@ object MusicLibrary {
 
     fun updatePlayList(playListV1: PlayListV1) {
         updateData(playListKey, playListV1)
-        println("updatePlayList $playListV1")
     }
 
     fun loadPlayList(): PlayListV1 {
         val loadedData = loadData(playListKey) ?: PlayListV1(null, null)
-        println("loadPlayList $loadedData")
         return loadedData
     }
 
