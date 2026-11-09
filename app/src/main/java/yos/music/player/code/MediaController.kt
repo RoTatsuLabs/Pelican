@@ -15,6 +15,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Player.REPEAT_MODE_ALL
 import androidx.media3.common.Player.REPEAT_MODE_OFF
@@ -432,6 +433,18 @@ class YosPlaybackService : MediaSessionService() {
                     super.onMediaItemTransition(mediaItem, reason)
                 }
 
+                private var consecutiveErrors = 0
+
+                override fun onPlayerError(error: PlaybackException) {
+                    super.onPlayerError(error)
+                    consecutiveErrors++
+                    // Skip the unplayable item, but stop once a whole pass has failed
+                    if (consecutiveErrors < player.mediaItemCount && player.hasNextMediaItem()) {
+                        player.seekToNextMediaItem()
+                        player.prepare()
+                    }
+                }
+
                 /*override fun onIsPlayingChanged(isPlaying: Boolean) {
                     saveData()
                     super.onIsPlayingChanged(isPlaying)
@@ -457,6 +470,7 @@ class YosPlaybackService : MediaSessionService() {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     super.onIsPlayingChanged(isPlaying)
                     MediaViewModelObject.isPlaying.value = isPlaying
+                    if (isPlaying) consecutiveErrors = 0
                 }
 
                 override fun onEvents(player: Player, events: Player.Events) {
