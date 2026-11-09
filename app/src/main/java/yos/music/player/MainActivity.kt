@@ -1047,17 +1047,21 @@ class MainActivity : BaseActivity() {
         @Composable
     fun CheckAndRequestPermission() {
         val context = LocalContext.current
+        val storagePermission = if (hasScopedStorageWithMediaTypes()) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
         val requestPermissionLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
-            val isGranted = permissions.entries.all { it.value }
-            if (isGranted) {
+            val storageGranted = permissions[storagePermission] == true
+            if (storageGranted) {
                 // Load music list here
                 loadMusic(context, enforce = true)
+            }
+            if (storageGranted || permissions[Manifest.permission.BLUETOOTH_CONNECT] == true) {
                 sendBroadcast(Intent("yos.music.player.BLUETOOTH_STATUS_REFRESH"))
-            } else {
-                // Set music list to empty if permission is denied
-                // mainMusicList.value = mutableListOf()
             }
         }
 
@@ -1066,27 +1070,8 @@ class MainActivity : BaseActivity() {
 
                 var permissions = emptyArray<String>()
 
-                if ((hasScopedStorageWithMediaTypes()
-                            && ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.READ_MEDIA_AUDIO
-                    ) != PackageManager.PERMISSION_GRANTED)
-                    /*|| (!hasScopedStorageV2()
-                            && ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED)*/
-                    || (!hasScopedStorageWithMediaTypes()
-                            && ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.READ_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED)
-                ) {
-                    permissions += arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-
-                    if (hasScopedStorageWithMediaTypes()) {
-                        permissions += arrayOf(Manifest.permission.READ_MEDIA_AUDIO)
-                    }
+                if (ContextCompat.checkSelfPermission(context, storagePermission) != PackageManager.PERMISSION_GRANTED) {
+                    permissions += storagePermission
                 }
 
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1100,7 +1085,7 @@ class MainActivity : BaseActivity() {
                 if (permissions.isNotEmpty()) {
                     requestPermissionLauncher.launch(permissions)
                 }
-                else {
+                if (ContextCompat.checkSelfPermission(context, storagePermission) == PackageManager.PERMISSION_GRANTED) {
                     loadMusic(context)
                 }
             }
