@@ -34,7 +34,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             applicationVariants.all { variant ->
                 variant.outputs.all {
-                    def appName = "Flamingo"
+                    def appName = "Pelican"
                     def versionName = variant.versionName
                     def date = new Date().format('yyMMddHHmm')
                     outputFileName = "${appName}_${versionName}_${date}.ApK"

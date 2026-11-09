@@ -29,8 +29,8 @@
     <string name="settings_extend_statusbarlyric">ステータスバーの歌詞</string>
     <string name="settings_extend_statusbarlyric_desc">Lyric Getter API のステータスバー歌詞を使用します。</string>
     <string name="settings_others">その他</string>
-    <string name="settings_others_about">Flamingo について</string>
-    <string name="settings_others_about_desc">Flamingo について。</string>
+    <string name="settings_others_about">Pelican について</string>
+    <string name="settings_others_about_desc">Pelican について。</string>
     <string name="settings_audio_fade_in_out_desc">再生 / 一時停止時に音量をフェードイン / フェードアウトします。</string>
     <string name="tip_no_lyrics">歌詞が準備できていません</string>
     <string name="settings_others_statusbarlyric_basic_switch">全体のスイッチ</string>
