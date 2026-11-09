@@ -338,6 +338,7 @@ class YosPlaybackService : MediaSessionService() {
                 SettingsLibrary.AudioAttributes
             )
             .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
 
         val forwardingPlayer = object : ForwardingPlayer(player) {
