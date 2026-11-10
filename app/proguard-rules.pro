@@ -20,9 +20,6 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--keep class cn.lyric.getter.api.data.*{*;}
--keep class cn.lyric.getter.api.API{*;}
-
 # -keep class yos.music.player.data.libraries.Music { *; }
 # -keep class yos.music.player.data.libraries.PlayList { *; }
 # -keep class yos.music.player.data.libraries.PlayStatus { *; }
