@@ -13,8 +13,9 @@ android {
         applicationId "com.rotatsulabs.pelican"
         minSdk 23
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        // CI overrides these through the environment
+        versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
+        versionName(System.getenv("VERSION_NAME") ?: "1.0.0")
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -40,6 +41,13 @@ android {
                     outputFileName = "${appName}_${versionName}_${date}.apk"
                 }
             }
+        }
+        nightly {
+            initWith release
+            matchingFallbacks = ['release']
+            applicationIdSuffix ".nightly"
+            versionNameSuffix "-nightly"
+            signingConfig signingConfigs.debug
         }
     }
 
