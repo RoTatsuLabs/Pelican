@@ -121,6 +121,8 @@ class YosBasicApplication : Application() {
                         }
                     } catch (e:Exception) {
                         e.printStackTrace()
+                    } finally {
+                        yos.music.player.code.MediaController.playbackRestored.complete(Unit)
                     }
                 }
             },

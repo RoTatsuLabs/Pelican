@@ -34,6 +34,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +73,9 @@ object MediaController {
 
     @Stable
     var mediaControl: MediaController? = null
+
+    /** Completes once the saved queue has been restored at startup */
+    val playbackRestored = CompletableDeferred<Unit>()
 
     @Stable
     var musicPlaying = mutableStateOf<YosMediaItem?>(null)
@@ -387,7 +391,7 @@ class YosPlaybackService : MediaSessionService() {
                             }
                         }
 
-                        val thisPath = path?.path
+                        val thisPath = path?.takeUnless { it.scheme == "content" }?.path
 
                         val finalLrcContent = if (lrcContent == null) {
                             val lrcPath = "${thisPath?.substringBeforeLast(".")}.lrc"
