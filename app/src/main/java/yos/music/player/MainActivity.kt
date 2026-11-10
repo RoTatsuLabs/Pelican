@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -107,6 +108,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import uk.akane.libphonograph.hasScopedStorageWithMediaTypes
 import yos.music.player.code.MediaController
+import yos.music.player.code.playOpenedAudio
 import yos.music.player.code.utils.others.Vibrator
 import yos.music.player.code.utils.player.FadeExo.fadePause
 import yos.music.player.code.utils.player.FadeExo.fadePlay
@@ -159,6 +161,17 @@ class MainActivity : BaseActivity() {
 
     private val imageViewModel: ImageViewModel by viewModels()
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openAudio(intent)
+    }
+
+    private fun openAudio(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (intent.action != Intent.ACTION_VIEW) return
+        lifecycleScope.launch { playOpenedAudio(applicationContext, uri) }
+    }
+
     @Suppress("DEPRECATION")
     @OptIn(
         ExperimentalAnimationApi::class,
@@ -168,6 +181,7 @@ class MainActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         installSplashScreen()
         enableEdgeToEdge()
+        if (savedInstanceState == null) openAudio(intent)
         setContent {
             YosMusicTheme {
                 ProvideWindowInsets {
