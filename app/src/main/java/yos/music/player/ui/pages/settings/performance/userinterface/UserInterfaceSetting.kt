@@ -148,6 +148,38 @@ fun UserInterfaceSetting(navController: NavController) =
 
                         ListHeader(content = stringResource(id = R.string.settings_performance_ui_nowplaying_background_bass_desc))
 
+                        GroupSpacerMedium()
+
+                        val sliders = remember { backgroundSliders(context) }
+                        val openSlider = remember { mutableStateOf<Int?>(null) }
+                        ListHeader(content = stringResource(id = R.string.settings_nowplaying_bg_section))
+                        RoundColumn {
+                            sliders.forEachIndexed { index, slider ->
+                                if (index > 0) Divider()
+                                LabelItem(
+                                    title = stringResource(id = slider.title),
+                                    desc = slider.format(slider.get()),
+                                    onClick = { openSlider.value = index }
+                                )
+                            }
+                        }
+                        openSlider.value?.let { index ->
+                            val slider = sliders[index]
+                            SliderSettingDialog(
+                                title = stringResource(id = slider.title),
+                                description = stringResource(id = slider.description),
+                                value = slider.get(),
+                                range = slider.min..slider.max,
+                                step = slider.step,
+                                default = slider.default,
+                                format = slider.format,
+                                saveText = stringResource(id = R.string.settings_nowplaying_bg_save),
+                                resetText = stringResource(id = R.string.settings_nowplaying_bg_reset),
+                                onSave = slider.set,
+                                onDismiss = { openSlider.value = null }
+                            )
+                        }
+
                         GroupSpacer()
                     }
                 }

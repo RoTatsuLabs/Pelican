@@ -143,6 +143,106 @@ object SettingsLibrary {
     )
 
     /**
+     * Size of the background drawing compared with the screen, from 0.25 to 1
+     */
+    @Stable
+    var NowplayingBackgroundScale by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_scale",
+        initialValue = 0.5f
+    )
+
+    /**
+     * Frames per second of the background
+     */
+    @Stable
+    var NowplayingBackgroundFps by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_fps",
+        initialValue = 30
+    )
+
+    /**
+     * How fast the background gradient turns
+     */
+    @Stable
+    var NowplayingBackgroundSpeed by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_speed",
+        initialValue = 2f
+    )
+
+    /**
+     * How easily the background reacts to the bass
+     */
+    @Stable
+    var NowplayingBackgroundBassSensitivity by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_bass_sensitivity",
+        initialValue = 1f
+    )
+
+    /**
+     * Vertices per patch side of the background mesh
+     */
+    @Stable
+    var NowplayingBackgroundDetail by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_detail",
+        initialValue = 30
+    )
+
+    /**
+     * Saturation of the cover colors in the background
+     */
+    @Stable
+    var NowplayingBackgroundSaturation by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_saturation",
+        initialValue = 3f
+    )
+
+    /**
+     * Brightness of the background
+     */
+    @Stable
+    var NowplayingBackgroundBrightness by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_brightness",
+        initialValue = 0.75f
+    )
+
+    /**
+     * Mesh shapes of the background: 0 random, 1 to 6 a preset, 7 generated
+     */
+    @Stable
+    var NowplayingBackgroundStyle by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_style",
+        initialValue = 0
+    )
+
+    /**
+     * How dark the edges of the background are
+     */
+    @Stable
+    var NowplayingBackgroundVignette by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_vignette",
+        initialValue = 1f
+    )
+
+    /**
+     * Grain on the background, 1 only hides color banding
+     */
+    @Stable
+    var NowplayingBackgroundGrain by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_grain",
+        initialValue = 1f
+    )
+
+    /**
      * 界面工具栏模糊效果
      */
     @Stable

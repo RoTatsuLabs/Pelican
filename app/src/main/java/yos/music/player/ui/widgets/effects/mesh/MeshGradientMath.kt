@@ -166,6 +166,13 @@ internal fun randomControlPointPreset(random: Random = Random.Default): ControlP
     if (random.nextDouble() > 0.8) generateControlPoints(6, 6, random)
     else controlPointPresets[random.nextInt(controlPointPresets.size)]
 
+/** Style 0 is random like AMLL, 1 to 6 are the hand made presets, 7 is a new random 6x6 grid every time */
+internal fun controlPointPresetForStyle(style: Int, random: Random = Random.Default): ControlPointPreset = when {
+    style in 1..controlPointPresets.size -> controlPointPresets[style - 1]
+    style == controlPointPresets.size + 1 -> generateControlPoints(6, 6, random)
+    else -> randomControlPointPreset(random)
+}
+
 private class Cp(var x: Double, var y: Double, var ur: Double, var vr: Double, var up: Double, var vp: Double)
 
 private fun clamp01(x: Double) = min(max(x, 0.0), 1.0)
@@ -292,8 +299,14 @@ internal object CoverTexture {
         }
     }
 
-    /** [argb] holds SIZE x SIZE straight (not premultiplied) ARGB pixels, the result has the same layout */
-    fun process(argb: IntArray, width: Int = SIZE, height: Int = SIZE): IntArray {
+    /**
+     * [argb] holds SIZE x SIZE straight (not premultiplied) ARGB pixels, the result has the same layout.
+     * The defaults are what AMLL uses: saturation 3 and brightness 0.75.
+     */
+    fun process(
+        argb: IntArray, width: Int = SIZE, height: Int = SIZE,
+        saturation: Double = 3.0, brightness: Double = 0.75
+    ): IntArray {
         require(argb.size == width * height)
         // RGBA bytes, like ImageData
         val data = IntArray(argb.size * 4)
@@ -304,11 +317,12 @@ internal object CoverTexture {
             var b = (c and 0xFF).toDouble()
             r = (r - 128) * 0.4 + 128; g = (g - 128) * 0.4 + 128; b = (b - 128) * 0.4 + 128
             val gray = r * 0.3 + g * 0.59 + b * 0.11
-            r = gray * -2.0 + r * 3.0; g = gray * -2.0 + g * 3.0; b = gray * -2.0 + b * 3.0
+            val other = 1 - saturation
+            r = gray * other + r * saturation; g = gray * other + g * saturation; b = gray * other + b * saturation
             r = (r - 128) * 1.7 + 128; g = (g - 128) * 1.7 + 128; b = (b - 128) * 1.7 + 128
-            data[i * 4] = toByte(r * 0.75)
-            data[i * 4 + 1] = toByte(g * 0.75)
-            data[i * 4 + 2] = toByte(b * 0.75)
+            data[i * 4] = toByte(r * brightness)
+            data[i * 4 + 1] = toByte(g * brightness)
+            data[i * 4 + 2] = toByte(b * brightness)
             data[i * 4 + 3] = (c ushr 24) and 0xFF
         }
         blur(data, width, height, 2, 4)

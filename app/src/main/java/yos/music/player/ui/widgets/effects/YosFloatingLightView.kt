@@ -30,10 +30,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import yos.music.player.code.MediaController
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundBass
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundBassSensitivity
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundBrightness
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundDetail
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundEffect
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundFps
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundGrain
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundSaturation
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundScale
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundSpeed
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundStyle
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundVignette
 import yos.music.player.ui.widgets.effects.mesh.BassAnalyzer
 import yos.music.player.ui.widgets.effects.mesh.CoverTexture
 import yos.music.player.ui.widgets.effects.mesh.MeshGradientView
+import yos.music.player.ui.widgets.effects.mesh.MeshSettings
 
 /**
  * The playback page background: a mesh gradient made from the cover, ported from
@@ -47,13 +58,34 @@ fun YosFloatingLight(
     showMiniPlayer: () -> Boolean
 ) {
     val context = LocalContext.current
+    val rawCover = remember { mutableStateOf<IntArray?>(null) }
     val cover = remember { mutableStateOf<IntArray?>(null) }
     val viewState = remember { mutableStateOf<MeshGradientView?>(null) }
 
     LaunchedEffect(album()) {
         val uri = album()
-        cover.value = if (uri == null) null else withContext(Dispatchers.IO) { loadCover(context, uri) }
+        rawCover.value = if (uri == null) null else withContext(Dispatchers.IO) { loadCover(context, uri) }
     }
+
+    // The color look is applied to the small cover, so a new saturation or brightness needs no new download
+    val saturation = NowplayingBackgroundSaturation
+    val brightness = NowplayingBackgroundBrightness
+    LaunchedEffect(rawCover.value, saturation, brightness) {
+        val raw = rawCover.value
+        cover.value = if (raw == null) null else withContext(Dispatchers.Default) {
+            CoverTexture.process(raw, saturation = saturation.toDouble(), brightness = brightness.toDouble())
+        }
+    }
+
+    val settings = MeshSettings(
+        renderScale = NowplayingBackgroundScale,
+        fps = NowplayingBackgroundFps,
+        flowSpeed = NowplayingBackgroundSpeed,
+        detail = NowplayingBackgroundDetail,
+        style = NowplayingBackgroundStyle,
+        vignette = NowplayingBackgroundVignette,
+        grain = NowplayingBackgroundGrain
+    )
 
     val lifecycleState = LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val active = lifecycleState.value.isAtLeast(Lifecycle.State.RESUMED) && !showMiniPlayer()
@@ -63,6 +95,7 @@ fun YosFloatingLight(
         factory = { MeshGradientView(it).also { view -> viewState.value = view } },
         modifier = modifier,
         update = { view ->
+            view.applySettings(settings)
             view.setCover(cover.value)
             view.setFlowing(flowing)
         }
@@ -79,14 +112,14 @@ fun YosFloatingLight(
             view?.setBassLevel(0f)
             onDispose { }
         } else {
-            val analyzer = BassAnalyzer { view.setBassLevel(it) }
+            val analyzer = BassAnalyzer({ NowplayingBackgroundBassSensitivity }) { view.setBassLevel(it) }
             analyzer.start(sessionId)
             onDispose { analyzer.stop() }
         }
     }
 }
 
-/** The cover as the pixels of the mesh gradient texture */
+/** The cover as a small square of pixels. The look of the background is applied to it later */
 private suspend fun loadCover(context: Context, uri: Uri): IntArray? {
     val request = ImageRequest.Builder(context).data(uri).size(64).allowHardware(false).build()
     val bitmap = context.imageLoader.execute(request).drawable?.toBitmap() ?: return null
@@ -95,7 +128,7 @@ private suspend fun loadCover(context: Context, uri: Uri): IntArray? {
     val pixels = IntArray(size * size)
     small.getPixels(pixels, 0, size, 0, 0, size, size)
     if (small !== bitmap) small.recycle()
-    return CoverTexture.process(pixels)
+    return pixels
 }
 
 fun imageResolve(image: Bitmap, moreLight: Boolean = false): Bitmap {

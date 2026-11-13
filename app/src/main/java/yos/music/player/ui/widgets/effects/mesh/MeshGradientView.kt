@@ -29,6 +29,7 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     private var cover: IntArray? = null
     private var flowing = true
     private var bassLevel = 0f
+    private var settings = MeshSettings()
 
     init {
         surfaceTextureListener = this
@@ -51,6 +52,24 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
         }
     }
 
+    /** Changes how the gradient is drawn. A new detail or style builds the mesh of the cover again */
+    fun applySettings(new: MeshSettings) {
+        val old = settings
+        if (old == new) return
+        settings = new
+        val renderThread = thread ?: return
+        renderThread.frameMs = frameInterval(new.fps)
+        if (old.renderScale != new.renderScale) {
+            surfaceTexture?.setDefaultBufferSize(scaled(width, new.renderScale), scaled(height, new.renderScale))
+        }
+        val pixels = cover
+        val rebuild = old.detail != new.detail || old.style != new.style
+        renderThread.post {
+            it.settings = new
+            if (rebuild) it.setCover(pixels)
+        }
+    }
+
     /** The bass level from 0 to 1 */
     fun setBassLevel(level: Float) {
         bassLevel = level
@@ -58,18 +77,22 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     }
 
     override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
-        val renderThread = RenderThread(texture, width, height)
+        val renderThread = RenderThread(texture, width, height, settings)
         renderThread.flowing = flowing
         renderThread.bass = bassLevel
         val pixels = cover
-        renderThread.post { it.setCover(pixels) }
+        val current = settings
+        renderThread.post {
+            it.settings = current
+            it.setCover(pixels)
+        }
         thread = renderThread
         renderThread.start()
     }
 
     override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
         // The TextureView resets the buffer size to the view size, so the smaller size is set again
-        texture.setDefaultBufferSize(scaled(width), scaled(height))
+        texture.setDefaultBufferSize(scaled(width, settings.renderScale), scaled(height, settings.renderScale))
         thread?.post { }
     }
 
@@ -83,7 +106,7 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {}
 
     private class RenderThread(
-        private val texture: SurfaceTexture, width: Int, height: Int
+        private val texture: SurfaceTexture, width: Int, height: Int, settings: MeshSettings
     ) : Thread("MeshGradientRender") {
         private val queue = LinkedBlockingQueue<(MeshGradientRenderer) -> Unit>()
         private val renderer = MeshGradientRenderer()
@@ -102,8 +125,11 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
         @Volatile
         var bass = 0f
 
+        @Volatile
+        var frameMs = frameInterval(settings.fps)
+
         init {
-            texture.setDefaultBufferSize(scaled(width), scaled(height))
+            texture.setDefaultBufferSize(scaled(width, settings.renderScale), scaled(height, settings.renderScale))
         }
 
         fun post(task: (MeshGradientRenderer) -> Unit) {
@@ -153,7 +179,7 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
                     last = System.nanoTime()
                     continue
                 }
-                val wait = FRAME_MS - (System.nanoTime() - frameStart) / 1_000_000L
+                val wait = frameMs - (System.nanoTime() - frameStart) / 1_000_000L
                 // A new cover wakes the thread early
                 if (wait > 0) queue.poll(wait, TimeUnit.MILLISECONDS)?.invoke(renderer)
             }
@@ -216,14 +242,9 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
             surface = EGL14.EGL_NO_SURFACE
         }
     }
-
-    private companion object {
-        // 30 frames per second saves battery, the gradient moves slowly
-        const val FRAME_MS = 33L
-
-        // The gradient is smooth, so it is drawn at half the size and scaled up by the TextureView
-        const val RENDER_SCALE = 0.5f
-
-        fun scaled(size: Int) = max(2, (size * RENDER_SCALE).toInt())
-    }
 }
+
+private fun frameInterval(fps: Int) = 1000L / fps.coerceIn(1, 120)
+
+// The gradient is smooth, so a smaller drawing scaled up by the TextureView looks the same
+private fun scaled(size: Int, scale: Float) = max(2, (size * scale.coerceIn(0.1f, 1f)).toInt())

@@ -50,6 +50,8 @@ uniform float u_volume;
 uniform float u_alpha;
 uniform float u_sinAngle;
 uniform float u_cosAngle;
+uniform float u_vignette;
+uniform float u_grain;
 
 const float INV_255 = 1.0 / 255.0;
 const float HALF_INV_255 = 0.5 / 255.0;
@@ -63,7 +65,7 @@ float gradientNoise(in vec2 uv) {
 void main() {
     float volumeEffect = u_volume * 2.0;
 
-    float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
+    float dither = (INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255) * u_grain;
 
     vec2 centeredUV = v_uv - vec2(0.2);
 
@@ -84,7 +86,7 @@ void main() {
 
     float dist = distance(v_uv, vec2(0.5));
     float vignette = smoothstep(0.8, 0.3, dist);
-    float mask = 0.6 + vignette * 0.4;
+    float mask = 1.0 - (1.0 - vignette) * 0.4 * u_vignette;
     result.rgb *= mask;
 
     gl_FragColor = result;
@@ -140,8 +142,8 @@ internal class MeshGradientRenderer {
     private var volume = 0f
     private var smoothedVolume = 0f
 
-    /** How fast the texture turns, 2 is what AMLL uses */
-    var flowSpeed = 2f
+    /** Applies to the next cover, except for the speed, the vignette and the grain which apply at once */
+    var settings = MeshSettings()
 
     fun onSurfaceCreated() {
         meshProgram = createProgram(MESH_VERTEX_SHADER, MESH_FRAGMENT_SHADER)
@@ -187,7 +189,7 @@ internal class MeshGradientRenderer {
             noCover = true
             return
         }
-        val geometry = buildHermiteMesh(randomControlPointPreset(), SUBDIVISIONS)
+        val geometry = buildHermiteMesh(controlPointPresetForStyle(settings.style), settings.detail)
         val vertexBuffer = generateBuffer()
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertexBuffer)
         GLES20.glBufferData(
@@ -227,7 +229,7 @@ internal class MeshGradientRenderer {
      * Returns true when nothing is changing any more, so the caller can stop drawing.
      */
     fun draw(deltaMs: Float, advanceTime: Boolean): Boolean {
-        if (advanceTime) frameTime += deltaMs * flowSpeed
+        if (advanceTime) frameTime += deltaMs * settings.flowSpeed
 
         var canBeStatic = states.isEmpty()
         val latest = states.lastOrNull()
@@ -278,6 +280,8 @@ internal class MeshGradientRenderer {
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_alpha"), 1f)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_sinAngle"), sin(angle))
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_cosAngle"), cos(angle))
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_vignette"), settings.vignette)
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_grain"), settings.grain)
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, state.texture)
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, state.vertexBuffer)
@@ -376,10 +380,5 @@ internal class MeshGradientRenderer {
             throw RuntimeException("Mesh gradient shader did not compile: $log")
         }
         return shader
-    }
-
-    private companion object {
-        // 50 in AMLL. The surface is smooth, so fewer vertices look the same and cost less on a phone
-        const val SUBDIVISIONS = 30
     }
 }

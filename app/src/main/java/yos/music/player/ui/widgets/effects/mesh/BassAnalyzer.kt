@@ -16,7 +16,7 @@ import kotlin.math.max
  * Measures the bass of the audio session of the player and reports it as a level from 0 to 1.
  * The Visualizer needs the record audio permission. It only reads what this app plays.
  */
-internal class BassAnalyzer(private val onLevel: (Float) -> Unit) {
+internal class BassAnalyzer(private val sensitivity: () -> Float, private val onLevel: (Float) -> Unit) {
     private var visualizer: Visualizer? = null
     private var peak = 0f
 
@@ -31,7 +31,7 @@ internal class BassAnalyzer(private val onLevel: (Float) -> Unit) {
                 override fun onWaveFormDataCapture(visualizer: Visualizer?, waveform: ByteArray?, samplingRate: Int) {}
 
                 override fun onFftDataCapture(visualizer: Visualizer?, fft: ByteArray?, samplingRate: Int) {
-                    if (fft != null) onLevel(level(fft, samplingRate))
+                    if (fft != null) onLevel(level(fft, samplingRate, sensitivity()))
                 }
             }, Visualizer.getMaxCaptureRate(), false, true)
             created.enabled = true
@@ -57,7 +57,7 @@ internal class BassAnalyzer(private val onLevel: (Float) -> Unit) {
     }
 
     /** The FFT holds the real part of the first and last bin, then a real and imaginary byte per bin */
-    internal fun level(fft: ByteArray, samplingRateMilliHz: Int): Float {
+    internal fun level(fft: ByteArray, samplingRateMilliHz: Int, sensitivity: Float = 1f): Float {
         val binHz = samplingRateMilliHz / 1000f / fft.size
         if (binHz <= 0f) return 0f
         val first = max(1, Math.ceil((LOW_HZ / binHz).toDouble()).toInt())
@@ -73,7 +73,8 @@ internal class BassAnalyzer(private val onLevel: (Float) -> Unit) {
         val magnitude = sum / count
         // Compared with the loudest recent bass, so the system volume does not matter
         peak = max(magnitude, peak * 0.99f)
-        val relative = magnitude / max(peak, MIN_PEAK)
+        // A higher sensitivity reacts to softer bass
+        val relative = magnitude / max(peak, MIN_PEAK) * sensitivity
         return ((relative - 0.5f) / 0.5f).coerceIn(0f, 1f)
     }
 
