@@ -85,6 +85,8 @@
     <string name="page_library_playlists_music_total">%d 首歌曲</string>
     <string name="settings_performance_ui_nowplaying_background_effect">背景动态效果</string>
     <string name="settings_performance_ui_nowplaying_background_effect_desc">播放页面背景的动态效果，可能导致性能问题。</string>
+    <string name="settings_performance_ui_nowplaying_background_bass">低音律动</string>
+    <string name="settings_performance_ui_nowplaying_background_bass_desc">背景随低音律动。需要麦克风权限，仅用于分析 Pelican 播放的音频。</string>
     <string name="page_library_playlists_add_title">新建播放列表…</string>
     <string name="page_library_playlists_fav_title">喜爱的歌曲</string>
     <string name="settings_performance_notification_title">媒体通知</string>

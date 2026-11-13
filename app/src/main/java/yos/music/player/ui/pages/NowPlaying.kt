@@ -275,7 +275,6 @@ fun NowPlaying(
                 album = { bitmap.value },
                 isPlaying = isPlayingStatusLambda,
                 modifier = Modifier.fillMaxSize(),
-                nowPage = { nowPageLambda() },
                 showMiniPlayer = showMiniPlayer
             )
         }

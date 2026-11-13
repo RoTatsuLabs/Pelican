@@ -129,6 +129,16 @@ object SettingsLibrary {
     var NowplayingBackgroundEffect by mutableDataSaverStateOf(
         dataSaverInterface = SettingsSaver,
         key = "settings_performance_ui_nowplaying_background_effect",
+        initialValue = true
+    )
+
+    /**
+     * The playback page background pulses with the bass
+     */
+    @Stable
+    var NowplayingBackgroundBass by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_bass",
         initialValue = false
     )
 

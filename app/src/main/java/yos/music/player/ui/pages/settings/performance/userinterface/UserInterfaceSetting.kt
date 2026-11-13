@@ -1,5 +1,11 @@
 package yos.music.player.ui.pages.settings.performance.userinterface
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -114,6 +120,33 @@ fun UserInterfaceSetting(navController: NavController) =
                         }
 
                         ListHeader(content = stringResource(id = R.string.settings_performance_ui_nowplaying_background_effect_desc))
+
+                        GroupSpacerMedium()
+
+                        val context = LocalContext.current
+                        // The bass is read from the audio of this player, and Android asks for the record audio permission for that
+                        val microphoneLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                            SettingsLibrary.NowplayingBackgroundBass = granted
+                        }
+                        RoundColumn {
+                            SwitchItem(
+                                title = stringResource(id = R.string.settings_performance_ui_nowplaying_background_bass),
+                                onClick = {
+                                    if (SettingsLibrary.NowplayingBackgroundBass) {
+                                        SettingsLibrary.NowplayingBackgroundBass = false
+                                    } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                                        PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        SettingsLibrary.NowplayingBackgroundBass = true
+                                    } else {
+                                        microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                    }
+                                },
+                                checkedLambda = { SettingsLibrary.NowplayingBackgroundBass }
+                            )
+                        }
+
+                        ListHeader(content = stringResource(id = R.string.settings_performance_ui_nowplaying_background_bass_desc))
 
                         GroupSpacer()
                     }

@@ -85,6 +85,8 @@
     <string name="page_library_playlists_music_total">%d 曲</string>
     <string name="settings_performance_ui_nowplaying_background_effect">背景の動的効果</string>
     <string name="settings_performance_ui_nowplaying_background_effect_desc">再生ページの背景の動的効果、パフォーマンスに問題を引き起こす可能性があります。</string>
+    <string name="settings_performance_ui_nowplaying_background_bass">低音に合わせて動く</string>
+    <string name="settings_performance_ui_nowplaying_background_bass_desc">背景が低音に合わせて脈動します。マイクの権限が必要ですが、Pelican が再生する音声の分析にのみ使用されます。</string>
     <string name="page_library_playlists_add_title">新しいプレイリストを作成…</string>
     <string name="page_library_playlists_fav_title">お気に入りの曲</string>
     <string name="settings_performance_notification_title">メディア通知</string>

@@ -1,201 +1,101 @@
 package yos.music.player.ui.widgets.effects
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.PorterDuff
-import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.view.animation.AccelerateDecelerateInterpolator
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.drawable.toBitmap
-import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import coil.ImageLoader
-import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
-import com.flaviofaria.kenburnsview.KenBurnsView
-import com.flaviofaria.kenburnsview.RandomTransitionGenerator
 import com.google.android.renderscript.Toolkit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import yos.music.player.code.utils.others.BitmapResolver
+import yos.music.player.code.MediaController
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundBass
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundEffect
-import yos.music.player.ui.pages.NowPlayingPage
-import yos.music.player.ui.widgets.basic.YosWrapper
+import yos.music.player.ui.widgets.effects.mesh.BassAnalyzer
+import yos.music.player.ui.widgets.effects.mesh.CoverTexture
+import yos.music.player.ui.widgets.effects.mesh.MeshGradientView
 
-@Stable
-private enum class Option {
-    Set,
-    Pause,
-    Resume,
-    Init
-}
-
+/**
+ * The playback page background: a mesh gradient made from the cover, ported from
+ * Apple Music-like Lyrics (https://github.com/amll-dev/applemusic-like-lyrics, GNU AGPL-3.0).
+ */
 @Composable
 fun YosFloatingLight(
     modifier: Modifier,
     album: () -> Uri?,
     isPlaying: () -> Boolean,
-    nowPage: () -> String,
     showMiniPlayer: () -> Boolean
 ) {
-    val drawable = remember(album) {
-        mutableStateOf<Drawable?>(null)
-    }
-
-    println("封面：" + drawable.value)
-
     val context = LocalContext.current
-    val imageLoader = ImageLoader(context)
-    YosWrapper {
-        LaunchedEffect(album()) {
-            if (album() == null) return@LaunchedEffect
-            withContext(Dispatchers.IO) {
-                val request = ImageRequest.Builder(context)
-                    .data(album())
-                    .build()
-                val thisBitmap = imageLoader.execute(request).drawable?.toBitmap()?.run {
-                    BitmapResolver.bitmapCompress(this)
-                }
-                if (thisBitmap != null) {
-                    drawable.value = imageResolve(
-                        thisBitmap
-                    ).toDrawable(context.resources)
-                    thisBitmap.recycle()
-                }
-                imageLoader.shutdown()
-            }
-        }
+    val cover = remember { mutableStateOf<IntArray?>(null) }
+    val viewState = remember { mutableStateOf<MeshGradientView?>(null) }
+
+    LaunchedEffect(album()) {
+        val uri = album()
+        cover.value = if (uri == null) null else withContext(Dispatchers.IO) { loadCover(context, uri) }
     }
 
-    YosWrapper {
-        val lossEffect = remember("YosFloatingLight_lossEffect") {
-            derivedStateOf {
-                nowPage() != NowPlayingPage.Lyric
-            }
-        }
+    val lifecycleState = LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val active = lifecycleState.value.isAtLeast(Lifecycle.State.RESUMED) && !showMiniPlayer()
+    val flowing = NowplayingBackgroundEffect && isPlaying() && active
 
-        val useBackground = remember("YosFloatingLight_useBackground") {
-            derivedStateOf {
-                album() == null
-            }
+    AndroidView(
+        factory = { MeshGradientView(it).also { view -> viewState.value = view } },
+        modifier = modifier,
+        update = { view ->
+            view.setCover(cover.value)
+            view.setFlowing(flowing)
         }
+    )
 
-        if (NowplayingBackgroundEffect) {
-            val lastOption = remember("YosFloatingLight_lastOption") {
-                mutableStateOf(Option.Init.name)
-            }
-            YosWrapper {
-                val lifecycleState =
-                    LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
-                val active = lifecycleState.value.isAtLeast(Lifecycle.State.RESUMED)&&!showMiniPlayer()
-                AndroidView(factory = {
-                    KenBurnsView(it).apply {
-                        setTransitionGenerator(
-                            RandomTransitionGenerator(
-                                12000,
-                                AccelerateDecelerateInterpolator()
-                            )
-                        )
-                    }
-                }, modifier = modifier.drawWithCache {
-                    onDrawBehind {
-                        if (useBackground.value) {
-                        drawRect(Color.Black)
-                            }
-                    }
-                }) {
-                    if (drawable.value != null) {
-                        if (it.drawable != drawable.value) {
-                            val thisOptionType = Option.Set.name
-                            if (lastOption.value == thisOptionType) return@AndroidView
-                            println("流光：设置背景")
-                            it.setImageDrawable(drawable.value!!)
-                            lastOption.value = thisOptionType
-                        } else if (!isPlaying() || !active) {
-                            val thisOptionType = Option.Pause.name
-                            if (lastOption.value == thisOptionType) return@AndroidView
-                            println("流光：暂停")
-                            it.pause()
-                            lastOption.value = thisOptionType
-                        } else {
-                            val thisOptionType = Option.Resume.name
-                            if (lastOption.value == thisOptionType) return@AndroidView
-                            println("流光：恢复")
-                            it.resume()
-                            lastOption.value = thisOptionType
-                        }
-                    }
-                }
-            }
+    // The bass needs the record audio permission. It only analyses the audio this player plays
+    val sessionId = MediaController.audioSessionId.intValue
+    val bass = flowing && NowplayingBackgroundBass && sessionId > 0 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+    val view = viewState.value
+    DisposableEffect(view, bass, sessionId) {
+        if (view == null || !bass) {
+            view?.setBassLevel(0f)
+            onDispose { }
         } else {
-            YosWrapper {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(data = drawable.value)
-                        .crossfade(true).build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = modifier
-                        .graphicsLayer {
-                            compositingStrategy = CompositingStrategy.Offscreen
-                        }
-                        .drawWithCache {
-                            onDrawBehind {
-                                if (useBackground.value) {
-                                    drawRect(Color.Black)
-                                }
-                            }
-                        }
-                )
-            }
-        }
-
-        YosWrapper {
-            val alpha = animateFloatAsState(
-                targetValue = if (lossEffect.value) 0.618f else 0f, animationSpec = tween(
-                    durationMillis = 300,
-                    easing = FastOutSlowInEasing
-                )
-            )
-            AsyncImage(
-                model = ImageRequest.Builder(context).data(data = drawable.value)
-                    .crossfade(true).build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        compositingStrategy = CompositingStrategy.Offscreen
-                        this.alpha = alpha.value
-                    },
-                colorFilter = ColorFilter.tint(Color(0x33000000), BlendMode.Overlay)
-            )
+            val analyzer = BassAnalyzer { view.setBassLevel(it) }
+            analyzer.start(sessionId)
+            onDispose { analyzer.stop() }
         }
     }
+}
+
+/** The cover as the pixels of the mesh gradient texture */
+private suspend fun loadCover(context: Context, uri: Uri): IntArray? {
+    val request = ImageRequest.Builder(context).data(uri).size(64).allowHardware(false).build()
+    val bitmap = context.imageLoader.execute(request).drawable?.toBitmap() ?: return null
+    val size = CoverTexture.SIZE
+    val small = Bitmap.createScaledBitmap(bitmap, size, size, true)
+    val pixels = IntArray(size * size)
+    small.getPixels(pixels, 0, size, 0, 0, size, size)
+    if (small !== bitmap) small.recycle()
+    return CoverTexture.process(pixels)
 }
 
 fun imageResolve(image: Bitmap, moreLight: Boolean = false): Bitmap {

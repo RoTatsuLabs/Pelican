@@ -85,6 +85,8 @@
     <string name="page_library_playlists_music_total">%d Songs</string>
     <string name="settings_performance_ui_nowplaying_background_effect">Background Dynamic Effect</string>
     <string name="settings_performance_ui_nowplaying_background_effect_desc">Dynamic effect of the playback page background, which may cause performance issues.</string>
+    <string name="settings_performance_ui_nowplaying_background_bass">Bass Pulse</string>
+    <string name="settings_performance_ui_nowplaying_background_bass_desc">The background pulses with the bass. It needs the microphone permission, which is only used to analyze the audio Pelican plays.</string>
     <string name="page_library_playlists_add_title">Create New Playlist…</string>
     <string name="page_library_playlists_fav_title">Favorite Songs</string>
     <string name="settings_performance_notification_title">Media Notifications</string>

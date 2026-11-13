@@ -9,6 +9,7 @@ import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
@@ -44,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import yos.music.player.MainActivity
 import yos.music.player.R
+import yos.music.player.code.MediaController.audioSessionId
 import yos.music.player.code.MediaController.mediaControl
 import yos.music.player.code.MediaController.mediaSession
 import yos.music.player.code.MediaController.musicPlaying
@@ -76,6 +78,9 @@ object MediaController {
 
     /** Completes once the saved queue has been restored at startup */
     val playbackRestored = CompletableDeferred<Unit>()
+
+    /** The audio session of the player, 0 until it has one. The background analyses its bass */
+    val audioSessionId = mutableIntStateOf(0)
 
     @Stable
     var musicPlaying = mutableStateOf<YosMediaItem?>(null)
@@ -344,6 +349,7 @@ class YosPlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
+        audioSessionId.intValue = player.audioSessionId
 
         val forwardingPlayer = object : ForwardingPlayer(player) {
             override fun play() {
@@ -448,6 +454,11 @@ class YosPlaybackService : MediaSessionService() {
                         player.seekToNextMediaItem()
                         player.prepare()
                     }
+                }
+
+                override fun onAudioSessionIdChanged(sessionId: Int) {
+                    super.onAudioSessionIdChanged(sessionId)
+                    audioSessionId.intValue = sessionId
                 }
 
                 /*override fun onIsPlayingChanged(isPlaying: Boolean) {
