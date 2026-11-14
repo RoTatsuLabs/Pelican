@@ -2,7 +2,7 @@
  * Mesh gradient background, ported to Kotlin from Apple Music-like Lyrics (AMLL)
  * https://github.com/amll-dev/applemusic-like-lyrics
  * Original work: Copyright (C) SteveXMH and the AMLL contributors, GNU AGPL-3.0.
- * The view and its render thread are new, they host the ported renderer.
+ * The view and its render thread are new, they host the ported renderers.
  */
 
 package yos.music.player.ui.widgets.effects.mesh
@@ -15,6 +15,7 @@ import android.opengl.EGLContext
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.util.Log
+import android.view.Surface
 import android.view.TextureView
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -22,7 +23,8 @@ import kotlin.math.max
 
 /**
  * The animated mesh gradient. It lives in a TextureView, so it follows the transforms and
- * the alpha of the compose layout around it. The drawing runs on its own thread.
+ * the alpha of the compose layout around it. The drawing runs on its own thread, with Vulkan or
+ * OpenGL ES depending on [MeshSettings.backend]. The backend is chosen when the view is made.
  */
 class MeshGradientView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
     private var thread: RenderThread? = null
@@ -39,7 +41,7 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     internal fun setCover(pixels: IntArray?) {
         if (cover === pixels) return
         cover = pixels
-        thread?.post { it.setCover(pixels) }
+        thread?.setCover(pixels)
     }
 
     /** True lets the gradient flow. False stops it, a fade between two covers still plays */
@@ -48,7 +50,7 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
         this.flowing = flowing
         thread?.let {
             it.flowing = flowing
-            it.post { }
+            it.wake()
         }
     }
 
@@ -58,16 +60,10 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
         if (old == new) return
         settings = new
         val renderThread = thread ?: return
-        renderThread.frameMs = frameInterval(new.fps)
         if (old.renderScale != new.renderScale) {
             surfaceTexture?.setDefaultBufferSize(scaled(width, new.renderScale), scaled(height, new.renderScale))
         }
-        val pixels = cover
-        val rebuild = old.detail != new.detail || old.style != new.style
-        renderThread.post {
-            it.settings = new
-            if (rebuild) it.setCover(pixels)
-        }
+        renderThread.applySettings(new, rebuild = old.detail != new.detail || old.style != new.style)
     }
 
     /** The bass level from 0 to 1 */
@@ -77,15 +73,9 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     }
 
     override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
-        val renderThread = RenderThread(texture, width, height, settings)
+        val renderThread = RenderThread(texture, width, height, settings, cover)
         renderThread.flowing = flowing
         renderThread.bass = bassLevel
-        val pixels = cover
-        val current = settings
-        renderThread.post {
-            it.settings = current
-            it.setCover(pixels)
-        }
         thread = renderThread
         renderThread.start()
     }
@@ -93,11 +83,11 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
         // The TextureView resets the buffer size to the view size, so the smaller size is set again
         texture.setDefaultBufferSize(scaled(width, settings.renderScale), scaled(height, settings.renderScale))
-        thread?.post { }
+        thread?.wake()
     }
 
     override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-        // The EGL surface has to be gone before the texture is released
+        // The EGL or Vulkan surface has to be gone before the texture is released
         thread?.shutdown()
         thread = null
         return true
@@ -106,10 +96,15 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
     override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {}
 
     private class RenderThread(
-        private val texture: SurfaceTexture, width: Int, height: Int, settings: MeshSettings
+        private val texture: SurfaceTexture,
+        width: Int,
+        height: Int,
+        @Volatile private var settings: MeshSettings,
+        @Volatile private var cover: IntArray?
     ) : Thread("MeshGradientRender") {
-        private val queue = LinkedBlockingQueue<(MeshGradientRenderer) -> Unit>()
-        private val renderer = MeshGradientRenderer()
+        private val queue = LinkedBlockingQueue<(MeshBackend<*>) -> Unit>()
+        private val bufferWidth = scaled(width, settings.renderScale)
+        private val bufferHeight = scaled(height, settings.renderScale)
         private var display: EGLDisplay = EGL14.EGL_NO_DISPLAY
         private var context: EGLContext = EGL14.EGL_NO_CONTEXT
         private var surface: EGLSurface = EGL14.EGL_NO_SURFACE
@@ -129,16 +124,30 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
         var frameMs = frameInterval(settings.fps)
 
         init {
-            texture.setDefaultBufferSize(scaled(width, settings.renderScale), scaled(height, settings.renderScale))
+            texture.setDefaultBufferSize(bufferWidth, bufferHeight)
         }
 
-        fun post(task: (MeshGradientRenderer) -> Unit) {
-            queue.offer(task)
+        fun setCover(pixels: IntArray?) {
+            cover = pixels
+            queue.offer { it.setCover(pixels) }
+        }
+
+        fun applySettings(new: MeshSettings, rebuild: Boolean) {
+            settings = new
+            frameMs = frameInterval(new.fps)
+            queue.offer {
+                it.settings = new
+                if (rebuild) it.setCover(cover)
+            }
+        }
+
+        fun wake() {
+            queue.offer { }
         }
 
         fun shutdown() {
             running = false
-            queue.offer { }
+            wake()
             try {
                 join(1000)
             } catch (_: InterruptedException) {
@@ -147,45 +156,94 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
 
         override fun run() {
             try {
-                initEgl()
-                renderer.onSurfaceCreated()
-                loop()
+                if (settings.backend == MeshSettings.VULKAN && VulkanMeshNative.available && runVulkan()) return
+                runOpenGl()
             } catch (e: Throwable) {
                 Log.e("MeshGradient", "The render thread stopped", e)
+            }
+        }
+
+        /** Returns false when Vulkan could not be used, so OpenGL ES can take over */
+        private fun runVulkan(): Boolean {
+            val nativeSurface = Surface(texture)
+            val handle = VulkanMeshNative.create(nativeSurface, bufferWidth, bufferHeight)
+            if (handle == 0L) {
+                nativeSurface.release()
+                Log.w("MeshGradient", "Vulkan is not available on this phone, OpenGL ES is used")
+                return false
+            }
+            val backend = VulkanMeshBackend(handle)
+            try {
+                prepare(backend)
+                loop(backend, present = { true }, beforeDraw = { })
+                return true
+            } catch (e: Throwable) {
+                Log.e("MeshGradient", "Vulkan stopped", e)
+                return !running
+            } finally {
+                try {
+                    backend.release()
+                } finally {
+                    VulkanMeshNative.destroy(handle)
+                    nativeSurface.release()
+                }
+            }
+        }
+
+        private fun runOpenGl() {
+            try {
+                initEgl()
+                val renderer = MeshGradientRenderer()
+                try {
+                    renderer.onSurfaceCreated()
+                    prepare(renderer)
+                    loop(renderer, present = { presentOpenGl() }, beforeDraw = { updateSize(renderer) })
+                } finally {
+                    // The context is still current here, the GPU objects need it to be deleted
+                    renderer.release()
+                }
             } finally {
                 releaseEgl()
             }
         }
 
-        private fun loop() {
+        private fun prepare(backend: MeshBackend<*>) {
+            backend.settings = settings
+            backend.setCover(cover)
+        }
+
+        private fun loop(backend: MeshBackend<*>, present: () -> Boolean, beforeDraw: () -> Unit) {
             var last = System.nanoTime()
             while (running) {
-                while (true) (queue.poll() ?: break).invoke(renderer)
-                updateSize()
+                while (true) (queue.poll() ?: break).invoke(backend)
+                beforeDraw()
 
                 val frameStart = System.nanoTime()
                 val delta = minOf((frameStart - last) / 1_000_000f, 100f)
                 last = frameStart
-                renderer.setVolume(bass)
-                val canBeStatic = renderer.draw(delta, flowing)
-                if (!EGL14.eglSwapBuffers(display, surface)) {
-                    Log.w("MeshGradient", "eglSwapBuffers failed: ${EGL14.eglGetError()}")
-                    break
-                }
+                backend.setVolume(bass)
+                val canBeStatic = backend.draw(delta, flowing)
+                if (!present()) break
 
                 if (canBeStatic && !flowing) {
                     // Nothing moves, so wait for the next change
-                    queue.take().invoke(renderer)
+                    queue.take().invoke(backend)
                     last = System.nanoTime()
                     continue
                 }
                 val wait = frameMs - (System.nanoTime() - frameStart) / 1_000_000L
                 // A new cover wakes the thread early
-                if (wait > 0) queue.poll(wait, TimeUnit.MILLISECONDS)?.invoke(renderer)
+                if (wait > 0) queue.poll(wait, TimeUnit.MILLISECONDS)?.invoke(backend)
             }
         }
 
-        private fun updateSize() {
+        private fun presentOpenGl(): Boolean {
+            if (EGL14.eglSwapBuffers(display, surface)) return true
+            Log.w("MeshGradient", "eglSwapBuffers failed: ${EGL14.eglGetError()}")
+            return false
+        }
+
+        private fun updateSize(renderer: MeshGradientRenderer) {
             val size = IntArray(1)
             EGL14.eglQuerySurface(display, surface, EGL14.EGL_WIDTH, size, 0)
             val newWidth = size[0]
@@ -229,10 +287,6 @@ class MeshGradientView(context: Context) : TextureView(context), TextureView.Sur
 
         private fun releaseEgl() {
             if (display == EGL14.EGL_NO_DISPLAY) return
-            if (context != EGL14.EGL_NO_CONTEXT && surface != EGL14.EGL_NO_SURFACE) {
-                EGL14.eglMakeCurrent(display, surface, surface, context)
-                renderer.release()
-            }
             EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
             if (surface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, surface)
             if (context != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(display, context)

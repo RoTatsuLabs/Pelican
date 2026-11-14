@@ -88,6 +88,8 @@
     <string name="settings_performance_ui_nowplaying_background_bass">低音に合わせて動く</string>
     <string name="settings_performance_ui_nowplaying_background_bass_desc">背景が低音に合わせて脈動します。マイクの権限が必要ですが、Pelican が再生する音声の分析にのみ使用されます。</string>
     <string name="settings_nowplaying_bg_section">背景エフェクトの詳細</string>
+    <string name="settings_nowplaying_bg_renderer">レンダラー</string>
+    <string name="settings_nowplaying_bg_renderer_desc">機種によっては Vulkan の方が省電力です。対応していない場合は OpenGL ES が使われます。</string>
     <string name="settings_nowplaying_bg_scale">解像度</string>
     <string name="settings_nowplaying_bg_scale_desc">背景を描画する鮮明さ。値が低いほどバッテリーに優しくなります。</string>
     <string name="settings_nowplaying_bg_fps">フレームレート</string>

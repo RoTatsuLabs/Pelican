@@ -12,6 +12,8 @@ Ported files, with the AMLL files they come from:
 | --- | --- |
 | `ui/widgets/effects/mesh/MeshPresets.kt` | `mesh-renderer/cp-presets.ts` |
 | `ui/widgets/effects/mesh/MeshGradientMath.kt` | `mesh-renderer/index.ts`, `mesh-renderer/cp-generate.ts`, `img.ts` |
-| `ui/widgets/effects/mesh/MeshGradientRenderer.kt` | `mesh-renderer/index.ts`, `mesh-renderer/mesh.vert.glsl`, `mesh-renderer/mesh.frag.glsl` |
+| `ui/widgets/effects/mesh/MeshBackend.kt` | `mesh-renderer/index.ts` (the fade between covers, the flow of time) |
+| `ui/widgets/effects/mesh/MeshGradientRenderer.kt` | `mesh-renderer/index.ts`, `mesh-renderer/mesh.vert.glsl`, `mesh-renderer/mesh.frag.glsl` (OpenGL ES) |
+| `cpp/vulkan_mesh.cpp`, `cpp/shaders/` | `mesh-renderer/index.ts`, `mesh-renderer/mesh.vert.glsl`, `mesh-renderer/mesh.frag.glsl` (Vulkan) |
 
-`MeshGradientView.kt` and `BassAnalyzer.kt` are new code written for Pelican.
+`MeshGradientView.kt`, `BassAnalyzer.kt`, `VulkanMeshNative.kt` and `cpp/vulkan_mesh_jni.cpp` are new code written for Pelican.

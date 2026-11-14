@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -34,6 +35,7 @@ import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundBassS
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundBrightness
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundDetail
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundEffect
+import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundRenderer
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundFps
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundGrain
 import yos.music.player.data.libraries.SettingsLibrary.NowplayingBackgroundSaturation
@@ -84,22 +86,31 @@ fun YosFloatingLight(
         detail = NowplayingBackgroundDetail,
         style = NowplayingBackgroundStyle,
         vignette = NowplayingBackgroundVignette,
-        grain = NowplayingBackgroundGrain
+        grain = NowplayingBackgroundGrain,
+        backend = NowplayingBackgroundRenderer
     )
 
     val lifecycleState = LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val active = lifecycleState.value.isAtLeast(Lifecycle.State.RESUMED) && !showMiniPlayer()
     val flowing = NowplayingBackgroundEffect && isPlaying() && active
 
-    AndroidView(
-        factory = { MeshGradientView(it).also { view -> viewState.value = view } },
-        modifier = modifier,
-        update = { view ->
-            view.applySettings(settings)
-            view.setCover(cover.value)
-            view.setFlowing(flowing)
-        }
-    )
+    // The graphics API is chosen when the view is made, so a new renderer needs a new view
+    key(settings.backend) {
+        AndroidView(
+            factory = {
+                MeshGradientView(it).also { view ->
+                    view.applySettings(settings)
+                    viewState.value = view
+                }
+            },
+            modifier = modifier,
+            update = { view ->
+                view.applySettings(settings)
+                view.setCover(cover.value)
+                view.setFlowing(flowing)
+            }
+        )
+    }
 
     // The bass needs the record audio permission. It only analyses the audio this player plays
     val sessionId = MediaController.audioSessionId.intValue

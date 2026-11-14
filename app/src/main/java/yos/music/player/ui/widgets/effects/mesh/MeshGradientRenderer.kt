@@ -2,7 +2,7 @@
  * Mesh gradient background, ported to Kotlin from Apple Music-like Lyrics (AMLL)
  * https://github.com/amll-dev/applemusic-like-lyrics
  * Original work: Copyright (C) SteveXMH and the AMLL contributors, GNU AGPL-3.0.
- * Ported from packages/core/src/bg-render/mesh-renderer: shaders, offscreen blending and album crossfade.
+ * Ported from packages/core/src/bg-render/mesh-renderer: shaders and offscreen blending.
  */
 
 package yos.music.player.ui.widgets.effects.mesh
@@ -11,10 +11,7 @@ import android.opengl.GLES20
 import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sin
 
 // The vertex colors of AMLL are always white, so the shader leaves them out
@@ -118,15 +115,12 @@ void main() {
 """
 
 /**
- * Draws the mesh gradient. Every method must run on the thread that owns the GL context.
- * Each cover gets its own mesh. A new cover fades in over the old one, then the old one is dropped.
+ * Draws the mesh gradient with OpenGL ES 2.0. Every method must run on the thread that owns the GL context.
+ * Each cover is drawn into an offscreen texture, then blended onto the screen with the alpha of its fade.
  */
-internal class MeshGradientRenderer {
-    private class MeshState(
-        val vertexBuffer: Int, val indexBuffer: Int, val indexCount: Int, val texture: Int, var alpha: Float
-    )
+internal class MeshGradientRenderer : MeshBackend<MeshGradientRenderer.GlState>() {
+    class GlState(val vertexBuffer: Int, val indexBuffer: Int, val indexCount: Int, val texture: Int)
 
-    private val states = ArrayList<MeshState>()
     private var meshProgram = 0
     private var quadProgram = 0
     private var meshPos = 0
@@ -137,13 +131,6 @@ internal class MeshGradientRenderer {
     private var framebufferTexture = 0
     private var width = 0
     private var height = 0
-    private var noCover = true
-    private var frameTime = 0f
-    private var volume = 0f
-    private var smoothedVolume = 0f
-
-    /** Applies to the next cover, except for the speed, the vignette and the grain which apply at once */
-    var settings = MeshSettings()
 
     fun onSurfaceCreated() {
         meshProgram = createProgram(MESH_VERTEX_SHADER, MESH_FRAGMENT_SHADER)
@@ -183,13 +170,9 @@ internal class MeshGradientRenderer {
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
     }
 
-    /** The cover as SIZE x SIZE processed ARGB pixels, or null when there is no cover */
-    fun setCover(pixels: IntArray?) {
-        if (pixels == null) {
-            noCover = true
-            return
-        }
-        val geometry = buildHermiteMesh(controlPointPresetForStyle(settings.style), settings.detail)
+    override fun canPaint() = framebuffer != 0
+
+    override fun createState(pixels: IntArray, geometry: MeshGeometry): GlState {
         val vertexBuffer = generateBuffer()
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vertexBuffer)
         GLES20.glBufferData(
@@ -214,60 +197,22 @@ internal class MeshGradientRenderer {
             GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, rgba
         )
         setTextureParameters(GLES20.GL_MIRRORED_REPEAT)
-
-        states.add(MeshState(vertexBuffer, indexBuffer, geometry.indices.size, texture, 0f))
-        noCover = false
+        return GlState(vertexBuffer, indexBuffer, geometry.indices.size, texture)
     }
 
-    /** The bass level from 0 to 1. AMLL scales it by 1/10 before it reaches the shader */
-    fun setVolume(level: Float) {
-        volume = level.coerceIn(0f, 1f) / 10f
+    override fun destroyState(state: GlState) {
+        GLES20.glDeleteBuffers(2, intArrayOf(state.vertexBuffer, state.indexBuffer), 0)
+        GLES20.glDeleteTextures(1, intArrayOf(state.texture), 0)
     }
 
-    /**
-     * Draws one frame. The texture only turns while [advanceTime] is true, a fade still plays.
-     * Returns true when nothing is changing any more, so the caller can stop drawing.
-     */
-    fun draw(deltaMs: Float, advanceTime: Boolean): Boolean {
-        if (advanceTime) frameTime += deltaMs * settings.flowSpeed
-
-        var canBeStatic = states.isEmpty()
-        val latest = states.lastOrNull()
-        val deltaFactor = deltaMs / 500f
-        if (latest != null) {
-            if (noCover) {
-                var hasActive = false
-                for (i in states.indices.reversed()) {
-                    val state = states[i]
-                    if (state.alpha <= -0.1f) {
-                        release(state)
-                        states.removeAt(i)
-                    } else {
-                        state.alpha = max(-0.1f, state.alpha - deltaFactor)
-                        hasActive = true
-                    }
-                }
-                canBeStatic = !hasActive
-            } else {
-                if (latest.alpha >= 1.1f) {
-                    while (states.size > 1) release(states.removeAt(0))
-                } else {
-                    latest.alpha = min(1.1f, latest.alpha + deltaFactor)
-                }
-                canBeStatic = states.size == 1 && latest.alpha >= 1.1f
-            }
-        }
-        if (framebuffer == 0) return canBeStatic
-
-        smoothedVolume += (volume - smoothedVolume) * min(1f, deltaMs / (if (volume > smoothedVolume) 60f else 200f))
-
+    override fun paint(entries: List<MeshAnimator.Entry<GlState>>, angle: Float, volume: Float) {
         GLES20.glViewport(0, 0, width, height)
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        val angle = (frameTime / 10000f + smoothedVolume) * 2f
-        for (state in states) {
+        for (entry in entries) {
+            val state = entry.state
             // 1. The mesh goes to the offscreen texture, without blending
             GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, framebuffer)
             GLES20.glDisable(GLES20.GL_BLEND)
@@ -276,7 +221,7 @@ internal class MeshGradientRenderer {
             GLES20.glUseProgram(meshProgram)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_aspect"), width.toFloat() / height)
             GLES20.glUniform1i(GLES20.glGetUniformLocation(meshProgram, "u_texture"), 0)
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_volume"), smoothedVolume)
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_volume"), volume)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_alpha"), 1f)
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_sinAngle"), sin(angle))
             GLES20.glUniform1f(GLES20.glGetUniformLocation(meshProgram, "u_cosAngle"), cos(angle))
@@ -302,7 +247,7 @@ internal class MeshGradientRenderer {
             )
             GLES20.glUseProgram(quadProgram)
             GLES20.glUniform1i(GLES20.glGetUniformLocation(quadProgram, "u_texture"), 0)
-            GLES20.glUniform1f(GLES20.glGetUniformLocation(quadProgram, "u_alpha"), easeInOutSine(state.alpha.coerceIn(0f, 1f)))
+            GLES20.glUniform1f(GLES20.glGetUniformLocation(quadProgram, "u_alpha"), MeshAnimator.ease(entry.alpha))
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, framebufferTexture)
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, quadBuffer)
@@ -312,12 +257,9 @@ internal class MeshGradientRenderer {
             GLES20.glDisableVertexAttribArray(quadPos)
         }
         GLES20.glFlush()
-        return canBeStatic
     }
 
-    fun release() {
-        for (state in states) release(state)
-        states.clear()
+    override fun releaseGpu() {
         if (framebuffer != 0) GLES20.glDeleteFramebuffers(1, intArrayOf(framebuffer), 0)
         if (framebufferTexture != 0) GLES20.glDeleteTextures(1, intArrayOf(framebufferTexture), 0)
         if (quadBuffer != 0) GLES20.glDeleteBuffers(1, intArrayOf(quadBuffer), 0)
@@ -326,13 +268,6 @@ internal class MeshGradientRenderer {
         framebuffer = 0; framebufferTexture = 0; quadBuffer = 0; meshProgram = 0; quadProgram = 0
         width = 0; height = 0
     }
-
-    private fun release(state: MeshState) {
-        GLES20.glDeleteBuffers(2, intArrayOf(state.vertexBuffer, state.indexBuffer), 0)
-        GLES20.glDeleteTextures(1, intArrayOf(state.texture), 0)
-    }
-
-    private fun easeInOutSine(x: Float) = (-(cos(PI * x) - 1) / 2).toFloat()
 
     private fun generateBuffer(): Int = IntArray(1).also { GLES20.glGenBuffers(1, it, 0) }[0]
 

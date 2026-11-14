@@ -25,6 +25,13 @@ private fun percent(value: Float) = "${(value * 100).roundToInt()}%"
 /** The sliders of the playback page background, in the order they are shown */
 fun backgroundSliders(context: Context): List<BackgroundSlider> = listOf(
     BackgroundSlider(
+        R.string.settings_nowplaying_bg_renderer, R.string.settings_nowplaying_bg_renderer_desc,
+        0f, 1f, 1f, 0f,
+        { SettingsLibrary.NowplayingBackgroundRenderer.toFloat() },
+        { SettingsLibrary.NowplayingBackgroundRenderer = it.roundToInt() },
+        { if (it.roundToInt() == 1) "Vulkan" else "OpenGL ES" }
+    ),
+    BackgroundSlider(
         R.string.settings_nowplaying_bg_scale, R.string.settings_nowplaying_bg_scale_desc,
         0.25f, 1f, 0.05f, 0.5f,
         { SettingsLibrary.NowplayingBackgroundScale }, { SettingsLibrary.NowplayingBackgroundScale = it },

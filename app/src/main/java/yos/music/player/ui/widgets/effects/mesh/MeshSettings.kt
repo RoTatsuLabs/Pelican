@@ -21,5 +21,12 @@ data class MeshSettings(
     /** 1 is what AMLL uses, 0 is none */
     val vignette: Float = 1f,
     /** 1 only hides color banding like AMLL does, more is visible grain */
-    val grain: Float = 1f
-)
+    val grain: Float = 1f,
+    /** [OPENGL] or [VULKAN]. Vulkan falls back to OpenGL ES when the phone cannot use it */
+    val backend: Int = OPENGL
+) {
+    companion object {
+        const val OPENGL = 0
+        const val VULKAN = 1
+    }
+}

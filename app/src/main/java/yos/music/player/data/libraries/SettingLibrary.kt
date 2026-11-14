@@ -143,6 +143,16 @@ object SettingsLibrary {
     )
 
     /**
+     * The graphics API of the background: 0 OpenGL ES, 1 Vulkan
+     */
+    @Stable
+    var NowplayingBackgroundRenderer by mutableDataSaverStateOf(
+        dataSaverInterface = SettingsSaver,
+        key = "settings_performance_ui_nowplaying_background_renderer",
+        initialValue = 0
+    )
+
+    /**
      * Size of the background drawing compared with the screen, from 0.25 to 1
      */
     @Stable

@@ -13,6 +13,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- The background can draw with Vulkan, OpenGL ES is used on phones without it -->
+    <uses-feature
+        android:name="android.hardware.vulkan.version"
+        android:required="false" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
     <application

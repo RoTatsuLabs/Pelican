@@ -48,3 +48,6 @@
 }
 
 -keep class com.cormor.overscroll.core.OverScrollKt
+
+# The names of the native methods are looked up from the Vulkan library
+-keep class yos.music.player.ui.widgets.effects.mesh.VulkanMeshNative { native <methods>; }

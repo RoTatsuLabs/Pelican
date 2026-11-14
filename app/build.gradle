@@ -23,6 +23,13 @@ android {
             abiFilters "armeabi-v7a", "arm64-v8a"
         }
 
+        externalNativeBuild {
+            cmake {
+                // libvulkan exists from Android 7 (API 24). On older phones the library does not load and OpenGL ES is used
+                arguments "-DANDROID_PLATFORM=android-24"
+            }
+        }
+
         renderscriptTargetApi 19
         renderscriptSupportModeEnabled true
     }
@@ -48,6 +55,13 @@ android {
             applicationIdSuffix ".nightly"
             versionNameSuffix "-nightly"
             signingConfig signingConfigs.debug
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
         }
     }
 

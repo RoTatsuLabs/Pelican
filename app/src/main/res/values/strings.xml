@@ -88,6 +88,8 @@
     <string name="settings_performance_ui_nowplaying_background_bass">Bass Pulse</string>
     <string name="settings_performance_ui_nowplaying_background_bass_desc">The background pulses with the bass. It needs the microphone permission, which is only used to analyze the audio Pelican plays.</string>
     <string name="settings_nowplaying_bg_section">Background Effect Details</string>
+    <string name="settings_nowplaying_bg_renderer">Renderer</string>
+    <string name="settings_nowplaying_bg_renderer_desc">Vulkan can be lighter on some phones. If this phone cannot use it, OpenGL ES is used instead.</string>
     <string name="settings_nowplaying_bg_scale">Resolution</string>
     <string name="settings_nowplaying_bg_scale_desc">How sharp the background is drawn. Lower values are lighter on the battery.</string>
     <string name="settings_nowplaying_bg_fps">Frame Rate</string>

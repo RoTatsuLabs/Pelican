@@ -88,6 +88,8 @@
     <string name="settings_performance_ui_nowplaying_background_bass">低音律動</string>
     <string name="settings_performance_ui_nowplaying_background_bass_desc">背景隨低音律動。需要麥克風權限，僅用於分析 Pelican 播放的音訊。</string>
     <string name="settings_nowplaying_bg_section">背景效果詳細設定</string>
+    <string name="settings_nowplaying_bg_renderer">算繪器</string>
+    <string name="settings_nowplaying_bg_renderer_desc">部分手機上 Vulkan 更省電。如果手機不支援，將自動使用 OpenGL ES。</string>
     <string name="settings_nowplaying_bg_scale">解析度</string>
     <string name="settings_nowplaying_bg_scale_desc">背景繪製的清晰度，數值越低越省電。</string>
     <string name="settings_nowplaying_bg_fps">影格率</string>
